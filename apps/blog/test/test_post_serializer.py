@@ -18,8 +18,6 @@ class PostSerializerTests(APITestCase):
         serializer = PostSerializer(instance=self.post)
         data = serializer.data
 
-        print("Serialized Post Data:", data)
-
         # Top-level fields
         self.assertEqual(data["id"], self.post.id)
         self.assertEqual(data["title"], self.post.title)
