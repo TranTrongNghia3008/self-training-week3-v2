@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "apps.api",
     "apps.blog",
     "apps.notifications",
+    'django_extensions',
 ]
 
 REST_FRAMEWORK = {
