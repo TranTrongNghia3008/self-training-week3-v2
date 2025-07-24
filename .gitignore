@@ -1,0 +1,79 @@
+# ========================
+# Python general
+# ========================
+*.py[cod]
+__pycache__/
+*.so
+*.egg
+*.egg-info/
+*.pyo
+
+# ========================
+# Virtual Environment
+# ========================
+.venv/
+env/
+venv/
+ENV/
+.Python
+
+# ========================
+# Django database
+# ========================
+db.sqlite3
+db.sqlite3-journal
+
+# ========================
+# Django migrations (keep real migrations!)
+# ========================
+**/__pycache__/
+**/migrations/__pycache__/
+**/migrations/*.pyc
+# DO NOT ignore real migration files like 0001_initial.py!
+
+# ========================
+# VS Code
+# ========================
+.vscode/
+
+# ========================
+# PyCharm
+# ========================
+.idea/
+*.iml
+
+# ========================
+# dotenv files
+# ========================
+.env
+.env.*
+
+# ========================
+# Logs
+# ========================
+*.log
+
+# ========================
+# Static/media files (optional if generated)
+# ========================
+staticfiles/
+media/
+static/
+build/
+
+# ========================
+# Coverage / testing
+# ========================
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+.cache
+nosetests.xml
+pytest_cache/
+
+# ========================
+# OS-specific
+# ========================
+.DS_Store
+Thumbs.db
