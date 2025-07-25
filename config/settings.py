@@ -168,3 +168,4 @@ CELERY_TASK_EAGER_PROPAGATES = True
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+LOGIN_URL = "/login/"
