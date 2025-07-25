@@ -1,0 +1,57 @@
+{% extends "core/base.html" %}
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="mb-4">
+    <h2 class="mb-1">{{ post.title }}</h2>
+    <p class="text-muted mb-0">
+      By <strong>{{ post.author.username }}</strong> | 
+      Category: <span class="badge bg-secondary">{{ post.category.name }}</span> |
+      <small>{{ post.created_at|date:"SHORT_DATE_FORMAT" }}</small>
+    </p>
+
+    {% if user == post.author %}
+      <div class="mt-2">
+        <a href="{% url 'blog_ui:post-edit-html' post.pk %}" class="btn btn-sm btn-warning">Edit</a>
+        <a href="{% url 'blog_ui:post-delete-html' post.pk %}" class="btn btn-sm btn-danger">Delete</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <p class="card-text">{{ post.content|linebreaks }}</p>
+    </div>
+  </div>
+
+  <!-- Comments Section -->
+  <h4 class="mb-3">Comments</h4>
+  <ul class="list-group mb-4">
+    {% for comment in post.comments.all %}
+      <li class="list-group-item">
+        <strong>{{ comment.author.username }}</strong>: {{ comment.content }}
+      </li>
+    {% empty %}
+      <li class="list-group-item text-muted">No comments yet.</li>
+    {% endfor %}
+  </ul>
+
+  {% if user.is_authenticated %}
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Add a Comment</h5>
+        <form method="post" action="{% url 'blog_ui:post-comment-html' post.pk %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <textarea name="content" class="form-control" rows="3" placeholder="Write your comment..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Post Comment</button>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <p class="text-muted">Please <a href="{% url 'login' %}">log in</a> to comment.</p>
+  {% endif %}
+</div>
+{% endblock %}

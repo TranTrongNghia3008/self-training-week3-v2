@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "apps.api",
     "apps.blog",
     "apps.notifications",
+    "apps.core",
     'django_extensions',
 ]
 
@@ -79,7 +80,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'apps' / 'core' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -89,6 +90,10 @@ TEMPLATES = [
             ],
         },
     },
+]
+
+STATICFILES_DIRS = [
+    BASE_DIR / 'apps' / 'core' / 'static',
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'

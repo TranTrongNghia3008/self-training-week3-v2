@@ -1,0 +1,32 @@
+{% extends "core/base.html" %}
+{% block title %}
+  {% if form.instance.pk %}Edit Post{% else %}New Post{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">{% if form.instance.pk %}Edit Post{% else %}New Post{% endif %}</h2>
+    <a href="{% url 'blog_ui:post-list-html' %}" class="btn btn-outline-secondary">← Back to Posts</a>
+  </div>
+
+  <form method="post" class="card p-4 shadow-sm">
+    {% csrf_token %}
+
+    {% for field in form %}
+      <div class="mb-3">
+        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}
+          <div class="form-text">{{ field.help_text }}</div>
+        {% endif %}
+        {% for error in field.errors %}
+          <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+
+    <button type="submit" class="btn btn-success">Save</button>
+  </form>
+</div>
+{% endblock %}
