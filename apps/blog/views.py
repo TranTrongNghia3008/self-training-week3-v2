@@ -15,7 +15,7 @@ class PostListCreateAPIView(generics.ListCreateAPIView):
     pagination_class = PostPagination
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        serializer.save(author=self.request.user, views=0)
 
 class PostRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Post.objects.all()
@@ -32,7 +32,10 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user, post_id=self.kwargs["post_id"])
 
-class CategoryListAPIView(generics.ListAPIView):
+class CategoryListCreateAPIView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [permissions.AllowAny]
+
+    def perform_create(self, serializer):
+        serializer.save()
