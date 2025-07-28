@@ -30,13 +30,7 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
         return Comment.objects.filter(post_id=self.kwargs["post_id"])
 
     def perform_create(self, serializer):
-        comment = serializer.save(author=self.request.user, post_id=self.kwargs["post_id"])
-
-        post_author_email = comment.post.author.email
-        subject = f"New Comment on Your Post '{comment.post.title}'"
-        message = f"{self.request.user.username} commented: {comment.content}"
-
-        send_notification_email.delay(subject, message, post_author_email)
+        serializer.save(author=self.request.user, post_id=self.kwargs["post_id"])
 
 class CategoryListAPIView(generics.ListAPIView):
     queryset = Category.objects.all()
