@@ -9,7 +9,7 @@ class PostPagination(PageNumberPagination):
     page_size = 10
 
 class PostListCreateAPIView(generics.ListCreateAPIView):
-    queryset = Post.objects.all().select_related("author", "category").prefetch_related("comments")
+    queryset = Post.objects.all().select_related("author", "category").prefetch_related("comments").order_by("-created_at")
     serializer_class = PostSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     pagination_class = PostPagination
