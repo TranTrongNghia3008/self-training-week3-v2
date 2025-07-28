@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.core",
     'django_extensions',
+    'drf_yasg',
 ]
 
 REST_FRAMEWORK = {
