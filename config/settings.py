@@ -93,7 +93,7 @@ TEMPLATES = [
 ]
 
 STATICFILES_DIRS = [
-    BASE_DIR / 'apps' / 'core' / 'static',
+    BASE_DIR / 'apps' / 'core',
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
