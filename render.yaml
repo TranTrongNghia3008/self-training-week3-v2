@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: django-blog
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: your-app-name.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: blog-db
+          property: connectionString
+      - key: CLOUDINARY_CLOUD_NAME
+        value: your_cloud_name
+      - key: CLOUDINARY_API_KEY
+        value: your_api_key
+      - key: CLOUDINARY_API_SECRET
+        value: your_api_secret
+      - key: REDIS_URL
+        fromService:
+          name: blog-redis
+          property: connectionString
