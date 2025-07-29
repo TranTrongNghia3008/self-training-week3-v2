@@ -120,7 +120,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # }
 
 DATABASES = {
-    'default': dj_database_url.config(default='postgres://localhost:5432/blogdb')
+    'default': dj_database_url.config(default=os.getenv('DATABASE_URL'))
 }
 
 
