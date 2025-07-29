@@ -48,3 +48,4 @@ wcwidth==0.2.13
 cloudinary
 django-cloudinary-storage
 dj_database_url
+gunicorn
