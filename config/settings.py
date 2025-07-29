@@ -39,15 +39,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    "rest_framework",
-    "rest_framework_simplejwt.token_blacklist",
-    "apps.users",
-    "apps.api",
-    "apps.blog",
-    "apps.notifications",
-    "apps.core",
+    'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
+    'apps.users',
+    'apps.api',
+    'apps.blog',
+    'apps.notifications',
+    'apps.core',
     'django_extensions',
     'drf_yasg',
+    'cloudinary',
+    'cloudinary_storage',
 ]
 
 REST_FRAMEWORK = {
@@ -59,7 +61,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=500),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'BLACKLIST_AFTER_ROTATION': True,
     'ROTATE_REFRESH_TOKENS': True,
@@ -183,4 +185,11 @@ SWAGGER_SETTINGS = {
             'description': 'JWT format: Bearer <access_token>',
         }
     }
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv("CLOUDINARY_CLOUD_NAME"),
+    'API_KEY': os.getenv("CLOUDINARY_API_KEY"),
+    'API_SECRET': os.getenv("CLOUDINARY_API_SECRET"),
 }

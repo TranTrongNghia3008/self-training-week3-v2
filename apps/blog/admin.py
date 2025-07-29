@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Post, Comment
+from .models import Category, Post, Comment, Media
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -15,3 +15,9 @@ class PostAdmin(admin.ModelAdmin):
 class CommentAdmin(admin.ModelAdmin):
     list_display = ("post", "author", "created_at")
     search_fields = ("content",)
+
+@admin.register(Media)
+class MediaAdmin(admin.ModelAdmin):
+    list_display = ("post", "file", "type", "uploaded_at")
+    search_fields = ("file",)
+    list_filter = ("type",)
