@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils.text import slugify
 from .models import Category, Post, Comment, Media
 from apps.users.serializers import UserSerializer
 import cloudinary
@@ -48,15 +49,53 @@ class MediaUploadSerializer(serializers.Serializer):
     file = serializers.FileField(write_only=True)
     post = serializers.IntegerField()
 
+
+class CategorySerializer(serializers.ModelSerializer):
+    slug = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = Category
+        fields = ["id", "name", "slug"]
+
+    def create(self, validated_data):
+        if "slug" not in validated_data or not validated_data["slug"]:
+            validated_data["slug"] = slugify(validated_data["name"])
+        return super().create(validated_data)
+
 class PostSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     comments = CommentSerializer(many=True, read_only=True)
     medias = MediaSerializer(many=True, read_only=True)
 
+    categories = CategorySerializer(many=True, read_only=True)
+    category_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        many=True,
+        write_only=True,
+        source="categories"
+    )
+
     class Meta:
         model = Post
-        fields = ["id", "author", "category", "title", "content", "is_published", "created_at", "updated_at", "comments", "views", "medias"]
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = ["id", "name", "slug"]
+        fields = [
+            "id", "author", "title", "content", "is_published",
+            "created_at", "updated_at", "comments", "views",
+            "medias", "categories", "category_ids"
+        ]
+        read_only_fields = ["id", "author", "created_at", "updated_at", "comments", "views", "medias", "categories"]
+
+    def create(self, validated_data):
+        categories = validated_data.pop("categories", [])
+        post = Post.objects.create(**validated_data)
+        post.categories.set(categories)
+        return post
+
+    def update(self, instance, validated_data):
+        categories = validated_data.pop("categories", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if categories is not None:
+            instance.categories.set(categories)
+        return instance
+

@@ -1,8 +1,6 @@
 from rest_framework.test import APITestCase
-from apps.users.models import User
 from apps.blog.models import Post, Comment, Category
 from apps.blog.serializers import PostSerializer
-from apps.users.serializers import UserSerializer
 from apps.blog.test.factories import UserFactory, PostFactory, CommentFactory, CategoryFactory
 
 
@@ -10,7 +8,9 @@ class PostSerializerTests(APITestCase):
     def setUp(self):
         self.user = UserFactory(username="nesteduser")
         self.category = CategoryFactory(name="Tech")
-        self.post = PostFactory(author=self.user, category=self.category)
+        self.post = PostFactory(author=self.user)
+        self.post.categories.add(self.category)  # many-to-many
+
         self.comment1 = CommentFactory(author=self.user, post=self.post, content="First!")
         self.comment2 = CommentFactory(author=self.user, post=self.post, content="Second!")
 
@@ -24,11 +24,21 @@ class PostSerializerTests(APITestCase):
         self.assertEqual(data["author"]["id"], self.user.id)
         self.assertEqual(data["author"]["username"], self.user.username)
 
+        # Categories
+        self.assertIn("categories", data)
+        self.assertEqual(len(data["categories"]), 1)
+        self.assertEqual(data["categories"][0]["id"], self.category.id)
+        self.assertEqual(data["categories"][0]["name"], self.category.name)
+
         # Nested comments
         self.assertIn("comments", data)
         self.assertEqual(len(data["comments"]), 2)
 
         # Check comment content and nested author
-        first_comment = data["comments"][0]
-        self.assertEqual(first_comment["author"]["id"], self.user.id)
-        self.assertEqual(first_comment["content"], "First!")
+        comment_contents = [comment["content"] for comment in data["comments"]]
+        self.assertIn("First!", comment_contents)
+        self.assertIn("Second!", comment_contents)
+
+        for comment in data["comments"]:
+            self.assertEqual(comment["author"]["id"], self.user.id)
+            self.assertEqual(comment["author"]["username"], self.user.username)

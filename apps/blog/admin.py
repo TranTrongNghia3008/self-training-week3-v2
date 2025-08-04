@@ -7,9 +7,14 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
-    list_display = ("title", "author", "category", "is_published", "created_at")
-    list_filter = ("is_published", "category")
+    list_display = ("title", "author", "get_categories", "is_published", "created_at")  # Sửa tại đây
+    list_filter = ("is_published", "categories")
     search_fields = ("title", "content")
+
+    def get_categories(self, obj):
+        return ", ".join([cat.name for cat in obj.categories.all()])
+    get_categories.short_description = "Categories"
+
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):

@@ -17,7 +17,7 @@ class Category(models.Model):
 
 class Post(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts")
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name="posts")
+    categories = models.ManyToManyField("Category", related_name="posts")
     title = models.CharField(max_length=255)
     content = models.TextField()
     is_published = models.BooleanField(default=False)

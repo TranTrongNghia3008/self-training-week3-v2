@@ -1,8 +1,9 @@
 from rest_framework import generics, permissions, parsers
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.exceptions import NotFound
 from .models import Post, Comment, Category, Media
 from .serializers import PostSerializer, CommentSerializer, CategorySerializer, MediaSerializer
-from apps.core.permissions import IsOwnerOrReadOnly
+from apps.core.permissions import IsOwnerOrReadOnly, ReadOnlyOrAdminCreatePermission
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
@@ -10,12 +11,46 @@ class PostPagination(PageNumberPagination):
     page_size = 10
 
 class PostListCreateAPIView(generics.ListCreateAPIView):
-    queryset = Post.objects.all().select_related("author", "category").prefetch_related("comments").order_by("-created_at")
     serializer_class = PostSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     pagination_class = PostPagination
 
-    @swagger_auto_schema(tags=["Post"])
+    def get_queryset(self):
+        queryset = Post.objects.all().select_related("author").prefetch_related("comments", "categories").order_by("-created_at")
+
+        search = self.request.query_params.get("search")
+        category_ids = self.request.query_params.get("category")  # expects comma-separated values
+
+        if search:
+            queryset = queryset.filter(title__icontains=search)
+
+        if category_ids:
+            try:
+                ids = [int(cid) for cid in category_ids.split(",") if cid.strip().isdigit()]
+                if ids:
+                    queryset = queryset.filter(categories__in=ids).distinct()
+            except ValueError:
+                pass 
+        return queryset
+
+
+    @swagger_auto_schema(
+        tags=["Post"],
+        manual_parameters=[
+            openapi.Parameter(
+                name="search",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="Search by title keyword",
+            ),
+            openapi.Parameter(
+                name="category",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,  # đổi từ INTEGER → STRING để hỗ trợ nhiều giá trị
+                description="Comma-separated category IDs (e.g., ?category=1,2,3)",
+            ),
+        ],
+    )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
@@ -63,12 +98,16 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user, post_id=self.kwargs["post_id"])
+        try:
+            post = Post.objects.get(id=self.kwargs["post_id"])
+        except Post.DoesNotExist:
+            raise NotFound("Post not found")
+        serializer.save(author=self.request.user, post=post)
 
 class CategoryListCreateAPIView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [ReadOnlyOrAdminCreatePermission]
 
     @swagger_auto_schema(tags=["Category"])
     def get(self, request, *args, **kwargs):
