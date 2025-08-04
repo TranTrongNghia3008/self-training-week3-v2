@@ -2,16 +2,13 @@ from rest_framework import serializers
 from .models import Category, Post, Comment, Media
 from apps.users.serializers import UserSerializer
 import cloudinary
-
+from .models import Media
 class CommentSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
 
     class Meta:
         model = Comment
         fields = ["id", "author", "content", "created_at"]
-
-from rest_framework import serializers
-from .models import Media
 
 class MediaSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
