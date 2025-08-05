@@ -2,10 +2,8 @@ from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.account.utils import user_email
 from django.utils.text import slugify
 from django.contrib.auth import get_user_model
-from django.http import JsonResponse
 
 User = get_user_model()
-
 
 class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
     def is_auto_signup_allowed(self, request, sociallogin):

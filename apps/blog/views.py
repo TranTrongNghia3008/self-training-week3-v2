@@ -1,11 +1,13 @@
 from rest_framework import generics, permissions, parsers
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import NotFound
+
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
 from .models import Post, Comment, Category, Media
 from .serializers import PostSerializer, CommentSerializer, CategorySerializer, MediaSerializer
 from apps.core.permissions import IsOwnerOrReadOnly, ReadOnlyOrAdminCreatePermission
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
 
 class PostPagination(PageNumberPagination):
     page_size = 10

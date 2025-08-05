@@ -1,9 +1,9 @@
+import cloudinary
 from rest_framework import serializers
 from django.utils.text import slugify
 from .models import Category, Post, Comment, Media
 from apps.users.serializers import UserSerializer
-import cloudinary
-from .models import Media
+
 class CommentSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
 

@@ -1,25 +1,26 @@
-from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
+
+from django.contrib.auth import get_user_model, authenticate
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
+
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from apps.notifications.tasks import send_notification_email
-from .serializers import RegisterSerializer
-from .throttles import LoginRateThrottle
+
 from dj_rest_auth.registration.views import SocialLoginView
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
 
-
+from apps.notifications.tasks import send_notification_email
+from .serializers import RegisterSerializer
+from .throttles import LoginRateThrottle
 
 User = get_user_model()
 
