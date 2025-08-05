@@ -6,6 +6,7 @@ from unittest.mock import patch
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 
 from apps.users.test.factories import UserFactory  
 from django.contrib.auth import get_user_model
@@ -16,6 +17,7 @@ User = get_user_model()
 class AuthTests(APITestCase):
 
     def setUp(self):
+        cache.clear()
         self.password = "testpass123"
         self.user = UserFactory(password=self.password)
         self.email = self.user.email
@@ -28,6 +30,7 @@ class AuthTests(APITestCase):
         self.reset_password_url = lambda uidb64, token: reverse(
             "reset_password", kwargs={"uidb64": uidb64, "token": token}
         )
+        self.unlock_url = reverse("unlock_user")
 
     def test_register_user(self):
         data = {
@@ -57,7 +60,7 @@ class AuthTests(APITestCase):
             "password": "wrongpass"
         }
         response = self.client.post(self.login_url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_invalid_login_nonexistent_user(self):
         data = {
@@ -65,7 +68,7 @@ class AuthTests(APITestCase):
             "password": "any"
         }
         response = self.client.post(self.login_url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_token_refresh(self):
         refresh = RefreshToken.for_user(self.user)
@@ -93,3 +96,43 @@ class AuthTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(new_password))
+
+    @patch("apps.notifications.tasks.send_notification_email.delay")
+    @patch("apps.users.views.LoginRateThrottle.allow_request", return_value=True)
+    def test_account_locked_after_failed_attempts(self, mock_throttle, mock_send_email):
+        user = UserFactory(password=self.password)
+        for _ in range(5):
+            response = self.client.post(self.login_url, {"username": user.username, "password": "wrongpass"})
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        response = self.client.post(self.login_url, {"username": user.username, "password": "wrongpass"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"], "This account is locked.")
+
+        user.refresh_from_db()
+        self.assertTrue(user.is_locked)
+
+        mock_send_email.assert_called_once_with(
+            subject="Your account has been locked",
+            message="You have entered the wrong password too many times. Please contact admin.",
+            recipient_email=user.email
+        )
+
+    def test_unlock_user_by_admin(self):
+        locked_user = UserFactory(is_locked=True, failed_login_attempts=5)
+        admin_user = UserFactory(is_staff=True, is_superuser=True)
+
+        # Authenticate as admin
+        refresh = RefreshToken.for_user(admin_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+
+        # Unlock the user
+        response = self.client.post(self.unlock_url, {"username": locked_user.username})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("has been unlocked", response.data["detail"])
+
+        # Check DB
+        locked_user.refresh_from_db()
+        self.assertFalse(locked_user.is_locked)
+        self.assertEqual(locked_user.failed_login_attempts, 0)
+

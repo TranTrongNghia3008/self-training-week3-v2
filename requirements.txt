@@ -49,3 +49,6 @@ cloudinary
 django-cloudinary-storage
 dj_database_url
 gunicorn
+django-allauth
+dj-rest-auth
+cryptography
