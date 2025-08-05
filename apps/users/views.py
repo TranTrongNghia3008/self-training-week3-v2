@@ -12,11 +12,11 @@ from apps.notifications.tasks import send_notification_email
 from .serializers import RegisterSerializer
 
 User = get_user_model()
+
 class RegisterUserView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
-
 
 class ForgotPasswordView(APIView):
     @swagger_auto_schema(
