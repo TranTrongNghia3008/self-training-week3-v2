@@ -52,3 +52,4 @@ gunicorn
 django-allauth
 dj-rest-auth
 cryptography
+django-redis

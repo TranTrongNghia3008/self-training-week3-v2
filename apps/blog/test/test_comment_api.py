@@ -4,9 +4,11 @@ from django.urls import reverse
 from apps.users.test.factories import UserFactory
 from apps.blog.test.factories import PostFactory, CommentFactory
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.cache import cache
 
 class CommentAPITests(APITestCase):
     def setUp(self):
+        cache.clear()
         self.user = UserFactory()
         self.post = PostFactory()
         self.comment_url = reverse('blog:post-comments', args=[self.post.id])

@@ -6,9 +6,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.blog.models import Category
 from apps.users.test.factories import UserFactory
 from apps.blog.test.factories import CategoryFactory
+from django.core.cache import cache
 
 class CategoryAPITests(APITestCase):
     def setUp(self):
+        cache.clear()
         self.user = UserFactory(is_staff=False)
         self.admin_user = UserFactory(is_staff=True)
 

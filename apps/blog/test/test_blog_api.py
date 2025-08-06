@@ -4,10 +4,12 @@ from rest_framework import status
 from apps.users.test.factories import UserFactory
 from apps.blog.test.factories import PostFactory, CategoryFactory
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.cache import cache
 
 
 class PostAPITests(APITestCase):
     def setUp(self):
+        cache.clear()
         self.user = UserFactory()
         self.category = CategoryFactory()
         self.post = PostFactory(author=self.user, categories=[self.category])

@@ -1,6 +1,10 @@
+from django.core.cache import cache
+import hashlib
+
 from rest_framework import generics, permissions, parsers
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import NotFound
+from rest_framework.response import Response
 
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -8,6 +12,7 @@ from drf_yasg import openapi
 from .models import Post, Comment, Category, Media
 from .serializers import PostSerializer, CommentSerializer, CategorySerializer, MediaSerializer
 from apps.core.permissions import IsOwnerOrReadOnly, ReadOnlyOrAdminCreatePermission
+from apps.core.utils import delete_cache_by_prefix
 
 class PostPagination(PageNumberPagination):
     page_size = 10
@@ -18,10 +23,23 @@ class PostListCreateAPIView(generics.ListCreateAPIView):
     pagination_class = PostPagination
 
     def get_queryset(self):
-        queryset = Post.objects.all().select_related("author").prefetch_related("comments", "categories").order_by("-created_at")
+        return Post.objects.all().select_related("author").prefetch_related("comments", "categories").order_by("-created_at")
 
-        search = self.request.query_params.get("search")
-        category_ids = self.request.query_params.get("category")  # expects comma-separated values
+    def list(self, request, *args, **kwargs):
+        search = request.query_params.get("search", "")
+        category_ids = request.query_params.get("category", "")
+        page = request.query_params.get("page", "1")
+
+        # Generate consistent cache key
+        raw_key = f"posts:list:{search}:{category_ids}:page:{page}"
+        cache_key = f"posts:{hashlib.md5(raw_key.encode()).hexdigest()}"
+
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
+        # Get queryset and apply filters
+        queryset = self.filter_queryset(self.get_queryset())
 
         if search:
             queryset = queryset.filter(title__icontains=search)
@@ -32,9 +50,23 @@ class PostListCreateAPIView(generics.ListCreateAPIView):
                 if ids:
                     queryset = queryset.filter(categories__in=ids).distinct()
             except ValueError:
-                pass 
-        return queryset
+                pass
 
+        page_obj = self.paginate_queryset(queryset)
+        if page_obj is not None:
+            serializer = self.get_serializer(page_obj, many=True)
+            response_data = self.get_paginated_response(serializer.data).data
+            cache.set(cache_key, response_data, timeout=60)
+            return Response(response_data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        data = serializer.data
+        cache.set(cache_key, data, timeout=60)
+        return Response(data)
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user, views=0)
+        delete_cache_by_prefix("posts:")
 
     @swagger_auto_schema(
         tags=["Post"],
@@ -43,15 +75,21 @@ class PostListCreateAPIView(generics.ListCreateAPIView):
                 name="search",
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="Search by title keyword",
+                description="Search by title",
             ),
             openapi.Parameter(
                 name="category",
                 in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,  # đổi từ INTEGER → STRING để hỗ trợ nhiều giá trị
-                description="Comma-separated category IDs (e.g., ?category=1,2,3)",
+                type=openapi.TYPE_STRING,
+                description="Comma-separated category IDs",
             ),
-        ],
+            openapi.Parameter(
+                name="page",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="Page number",
+            ),
+        ]
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
@@ -59,14 +97,19 @@ class PostListCreateAPIView(generics.ListCreateAPIView):
     @swagger_auto_schema(tags=["Post"])
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user, views=0)
-
+    
 class PostRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     permission_classes = [IsOwnerOrReadOnly]
+
+    def perform_update(self, serializer):
+        serializer.save()
+        delete_cache_by_prefix("posts:")
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        delete_cache_by_prefix("posts:")
 
     @swagger_auto_schema(tags=["Post"])
     def get(self, request, *args, **kwargs):
