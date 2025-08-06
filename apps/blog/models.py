@@ -21,6 +21,7 @@ class Post(models.Model):
     title = models.CharField(max_length=255)
     content = models.TextField()
     is_published = models.BooleanField(default=False)
+    scheduled_publish_time = models.DateTimeField(null=True, blank=True)
     views = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

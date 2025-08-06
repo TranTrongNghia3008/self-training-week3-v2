@@ -12,7 +12,7 @@ class PostAPITests(APITestCase):
         cache.clear()
         self.user = UserFactory()
         self.category = CategoryFactory()
-        self.post = PostFactory(author=self.user, categories=[self.category])
+        self.post = PostFactory(author=self.user, categories=[self.category], is_published=True)
 
         self.list_url = reverse('blog:post-list-create')
         self.detail_url = reverse('blog:post-detail', args=[self.post.id])
@@ -117,3 +117,21 @@ class PostAPITests(APITestCase):
         response_page_2 = self.client.get(f"{self.list_url}?page=2")
         self.assertEqual(response_page_2.status_code, status.HTTP_200_OK)
         self.assertTrue(len(response_page_2.data["results"]) > 0)
+
+    def test_unpublished_post_view_by_author(self):
+        post = PostFactory(is_published=False, author=self.user)
+        url = reverse("blog:post-detail", args=[post.id])
+
+        response = self.client.get(url, **self.auth_header)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_unpublished_post_view_by_other_user(self):
+        post = PostFactory(is_published=False)
+        other_user = UserFactory()
+        token = str(RefreshToken.for_user(other_user).access_token)
+        headers = {'HTTP_AUTHORIZATION': f'Bearer {token}'}
+
+        url = reverse("blog:post-detail", args=[post.id])
+        response = self.client.get(url, **headers)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+

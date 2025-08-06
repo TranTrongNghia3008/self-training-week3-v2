@@ -1,6 +1,7 @@
 import cloudinary
 from rest_framework import serializers
 from django.utils.text import slugify
+from django.utils import timezone
 from .models import Category, Post, Comment, Media
 from apps.users.serializers import UserSerializer
 
@@ -74,13 +75,12 @@ class PostSerializer(serializers.ModelSerializer):
         write_only=True,
         source="categories"
     )
+    scheduled_publish_time = serializers.DateTimeField(required=False, allow_null=True)
 
     class Meta:
         model = Post
         fields = [
-            "id", "author", "title", "content", "is_published",
-            "created_at", "updated_at", "comments", "views",
-            "medias", "categories", "category_ids"
+            "id", "author", "title", "content", "is_published", "scheduled_publish_time", "created_at", "updated_at", "comments", "views", "medias", "categories", "category_ids"
         ]
         read_only_fields = ["id", "author", "created_at", "updated_at", "comments", "views", "medias", "categories"]
 
@@ -99,3 +99,14 @@ class PostSerializer(serializers.ModelSerializer):
             instance.categories.set(categories)
         return instance
 
+    def validate(self, attrs):
+        scheduled_time = attrs.get("scheduled_publish_time")
+        is_published = attrs.get("is_published", False)
+
+        if scheduled_time:
+            if scheduled_time < timezone.now():
+                raise serializers.ValidationError("Scheduled publish time cannot be in the past.")
+            if is_published:
+                raise serializers.ValidationError("Post cannot be published before the scheduled publish time.")
+
+        return attrs

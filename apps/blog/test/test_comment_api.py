@@ -10,25 +10,56 @@ class CommentAPITests(APITestCase):
     def setUp(self):
         cache.clear()
         self.user = UserFactory()
+        self.other_user = UserFactory()
         self.post = PostFactory()
-        self.comment_url = reverse('blog:post-comments', args=[self.post.id])
         self.comment = CommentFactory(author=self.user, post=self.post)
+        self.comment_url = reverse('blog:post-comments', args=[self.post.id])
+        self.comment_detail_url = reverse('blog:comment-detail', args=[self.comment.id])
 
-        refresh = RefreshToken.for_user(self.user)
-        self.token = str(refresh.access_token)
-        self.auth = {'HTTP_AUTHORIZATION': f'Bearer {self.token}'}
+        self.user_token = str(RefreshToken.for_user(self.user).access_token)
+        self.other_token = str(RefreshToken.for_user(self.other_user).access_token)
+
+        self.user_auth = {'HTTP_AUTHORIZATION': f'Bearer {self.user_token}'}
+        self.other_auth = {'HTTP_AUTHORIZATION': f'Bearer {self.other_token}'}
 
     def test_list_comments(self):
         response = self.client.get(self.comment_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(response.data) >= 1)
 
     def test_create_comment_authenticated(self):
-        data = {"content": "A test comment"}
-        response = self.client.post(self.comment_url, data, **self.auth)
+        data = {"content": "A new test comment"}
+        response = self.client.post(self.comment_url, data, **self.user_auth)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["author"]["id"], self.user.id)
+        self.assertEqual(response.data["content"], "A new test comment")
 
     def test_create_comment_unauthenticated(self):
-        data = {"content": "A test comment"}
+        data = {"content": "Unauthenticated comment"}
         response = self.client.post(self.comment_url, data)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_comment_owner(self):
+        data = {"content": "Updated by owner"}
+        response = self.client.put(self.comment_detail_url, data, **self.user_auth)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["content"], "Updated by owner")
+
+    def test_update_comment_not_owner(self):
+        data = {"content": "Updated by other user"}
+        response = self.client.put(self.comment_detail_url, data, **self.other_auth)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_partial_update_comment_owner(self):
+        data = {"content": "Partially updated"}
+        response = self.client.patch(self.comment_detail_url, data, **self.user_auth)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["content"], "Partially updated")
+
+    def test_delete_comment_owner(self):
+        response = self.client.delete(self.comment_detail_url, **self.user_auth)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_delete_comment_not_owner(self):
+        response = self.client.delete(self.comment_detail_url, **self.other_auth)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

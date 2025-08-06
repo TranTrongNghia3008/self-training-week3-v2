@@ -197,8 +197,8 @@ CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
-CELERY_TASK_ALWAYS_EAGER = True
-CELERY_TASK_EAGER_PROPAGATES = True
+# CELERY_TASK_ALWAYS_EAGER = True
+# CELERY_TASK_EAGER_PROPAGATES = True
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
@@ -259,4 +259,13 @@ CACHES = {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
     }
+}
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "publish_scheduled_posts_every_minute": {
+        "task": "apps.blog.tasks.publish_scheduled_posts",
+        "schedule": crontab(minute="*/1"),
+    },
 }

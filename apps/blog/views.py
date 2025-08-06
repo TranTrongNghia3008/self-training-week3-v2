@@ -1,4 +1,6 @@
 from django.core.cache import cache
+from django.db.models import Q
+from django.utils import timezone
 import hashlib
 
 from rest_framework import generics, permissions, parsers
@@ -11,7 +13,7 @@ from drf_yasg import openapi
 
 from .models import Post, Comment, Category, Media
 from .serializers import PostSerializer, CommentSerializer, CategorySerializer, MediaSerializer
-from apps.core.permissions import IsOwnerOrReadOnly, ReadOnlyOrAdminCreatePermission
+from apps.core.permissions import IsOwnerOrReadOnly, ReadOnlyOrAdminCreatePermission, CanViewPost, IsMediaOwnerOrAdmin, CanAddMediaToOwnPost
 from apps.core.utils import delete_cache_by_prefix
 
 class PostPagination(PageNumberPagination):
@@ -19,11 +21,26 @@ class PostPagination(PageNumberPagination):
 
 class PostListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = PostSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [CanViewPost, permissions.IsAuthenticatedOrReadOnly]
     pagination_class = PostPagination
 
     def get_queryset(self):
-        return Post.objects.all().select_related("author").prefetch_related("comments", "categories").order_by("-created_at")
+        queryset = Post.objects.select_related("author").prefetch_related("comments", "categories")
+
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return queryset.order_by("-created_at")
+
+        if user.is_authenticated:
+            return queryset.filter(
+                Q(is_published=True, scheduled_publish_time__lte=timezone.now()) |
+                Q(author=user)
+            ).order_by("-created_at")
+
+        return queryset.filter(
+            is_published=True,
+            scheduled_publish_time__lte=timezone.now()
+        ).order_by("-created_at")
 
     def list(self, request, *args, **kwargs):
         search = request.query_params.get("search", "")
@@ -101,7 +118,7 @@ class PostListCreateAPIView(generics.ListCreateAPIView):
 class PostRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    permission_classes = [IsOwnerOrReadOnly]
+    permission_classes = [CanViewPost, IsOwnerOrReadOnly]
 
     def perform_update(self, serializer):
         serializer.save()
@@ -149,6 +166,26 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
             raise NotFound("Post not found")
         serializer.save(author=self.request.user, post=post)
 
+class CommentRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Comment.objects.select_related("author", "post")
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
+
+    @swagger_auto_schema(tags=["Comment"])
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(tags=["Comment"])
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)
+
+    @swagger_auto_schema(tags=["Comment"])
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
+
+    @swagger_auto_schema(tags=["Comment"])
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
 class CategoryListCreateAPIView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
@@ -168,7 +205,7 @@ class CategoryListCreateAPIView(generics.ListCreateAPIView):
 class MediaListCreateAPIView(generics.ListCreateAPIView):
     queryset = Media.objects.all()
     serializer_class = MediaSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanAddMediaToOwnPost]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
     @swagger_auto_schema(
@@ -202,7 +239,7 @@ class MediaListCreateAPIView(generics.ListCreateAPIView):
 class MediaRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Media.objects.all()
     serializer_class = MediaSerializer
-    permission_classes = [IsOwnerOrReadOnly]
+    permission_classes = [IsMediaOwnerOrAdmin]
 
     @swagger_auto_schema(tags=["Media"])
     def get(self, request, *args, **kwargs):
