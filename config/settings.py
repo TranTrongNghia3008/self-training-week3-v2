@@ -62,6 +62,7 @@ INSTALLED_APPS = [
 
     "rest_framework.authtoken",
     'dj_rest_auth',
+    'channels',
 ]
 SITE_ID = 1
 
@@ -139,6 +140,9 @@ DATABASES = {
         'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'postgres'),
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
         'PORT': os.getenv('POSTGRES_PORT', '5432'),
+        'TEST': {
+            'NAME': '', 
+        }
     }
 }
 
@@ -267,5 +271,15 @@ CELERY_BEAT_SCHEDULE = {
     "publish_scheduled_posts_every_minute": {
         "task": "apps.blog.tasks.publish_scheduled_posts",
         "schedule": crontab(minute="*/1"),
+    },
+}
+
+ASGI_APPLICATION = "config.asgi.application"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],  # Redis server
+        },
     },
 }

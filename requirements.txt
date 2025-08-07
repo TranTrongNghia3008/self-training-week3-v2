@@ -53,3 +53,7 @@ django-allauth
 dj-rest-auth
 cryptography
 django-redis
+channels
+websockets
+daphne
+channels_redis
