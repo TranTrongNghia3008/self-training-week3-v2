@@ -8,7 +8,7 @@ from apps.notifications.models import Notification
 
 @receiver(post_save, sender=Comment)
 def notify_on_comment_save(sender, instance, created, **kwargs):
-    print(f"[Signal] Comment {'created' if created else 'updated'}: {instance.id}")
+    print(f"[Signal] Comment {'created' if created else 'updated'}: {instance.id} - {instance.content}")
 
     channel_layer = get_channel_layer()
     comment_data = {
@@ -18,7 +18,7 @@ def notify_on_comment_save(sender, instance, created, **kwargs):
         "created_at": instance.created_at.isoformat(),
     }
 
-    # Gửi thông tin comment cho người đang xem bài viết
+    # Send comment information to people viewing the article
     async_to_sync(channel_layer.group_send)(
         f"post_{instance.post.id}",
         {
@@ -30,30 +30,34 @@ def notify_on_comment_save(sender, instance, created, **kwargs):
         }
     )
 
-    # Gửi thông báo nếu không phải tác giả comment tự comment vào bài của mình
-    if created and instance.post.author.id != instance.author.id:
-        recipient = instance.post.author
+    if not created:
+        return 
 
-        # Save to DB
-        notification = Notification.objects.create(
-            recipient=recipient,
-            message=f"{instance.author.username} just commented on your post: {instance.post.title}",
+    notified_user_ids = set()
+
+    # 1. Prioritize sending notifications to parent comment author (if different from commenter)
+    if instance.parent and instance.parent.author.id != instance.author.id:
+        Notification.objects.create(
+            recipient=instance.parent.author,
+            message=f"{instance.author.username} replied to your comment on: {instance.post.title}",
             content_type=ContentType.objects.get_for_model(instance),
             object_id=instance.id,
         )
+        notified_user_ids.add(instance.parent.author.id)
 
-        # # Push qua socket nếu online
-        # async_to_sync(channel_layer.group_send)(
-        #     f"notify_{recipient.id}",
-        #     {
-        #         "type": "notification_event",
-        #         "data": {
-        #             "message": notification.message,
-        #             "timestamp": notification.created_at.isoformat(),
-        #             "notification_id": notification.id,
-        #         },
-        #     }
-        # )
+    # 2. Send notification to post author if:
+    # - the commenter is not the post author
+    # - and has not received notification in the above step
+    if (
+        instance.post.author.id != instance.author.id and
+        instance.post.author.id not in notified_user_ids
+    ):
+        Notification.objects.create(
+            recipient=instance.post.author,
+            message=f"{instance.author.username} commented on your post: {instance.post.title}",
+            content_type=ContentType.objects.get_for_model(instance),
+            object_id=instance.id,
+        )
 
 @receiver(pre_delete, sender=Comment)
 def notify_on_comment_delete(sender, instance, **kwargs):

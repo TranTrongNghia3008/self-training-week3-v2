@@ -5,12 +5,20 @@ from django.utils import timezone
 from .models import Category, Post, Comment, Media
 from apps.users.serializers import UserSerializer
 
+class RecursiveField(serializers.Serializer):
+    def to_representation(self, value):
+        serializer = self.parent.parent.__class__(value, context=self.context)
+        return serializer.data
+
+
 class CommentSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
+    replies = RecursiveField(many=True, read_only=True)
+    parent = serializers.PrimaryKeyRelatedField(queryset=Comment.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = Comment
-        fields = ["id", "author", "content", "created_at"]
+        fields = ["id", "author", "content", "created_at", "parent", "replies"]
 
 class MediaSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
@@ -65,7 +73,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class PostSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
-    comments = CommentSerializer(many=True, read_only=True)
+    comments = serializers.SerializerMethodField()
     medias = MediaSerializer(many=True, read_only=True)
 
     categories = CategorySerializer(many=True, read_only=True)
@@ -83,6 +91,11 @@ class PostSerializer(serializers.ModelSerializer):
             "id", "author", "title", "content", "is_published", "scheduled_publish_time", "created_at", "updated_at", "comments", "views", "medias", "categories", "category_ids"
         ]
         read_only_fields = ["id", "author", "created_at", "updated_at", "comments", "views", "medias", "categories"]
+
+    def get_comments(self, obj):
+        root_comments = obj.comments.filter(parent=None).order_by("created_at")
+        return CommentSerializer(root_comments, many=True).data
+
 
     def create(self, validated_data):
         categories = validated_data.pop("categories", [])

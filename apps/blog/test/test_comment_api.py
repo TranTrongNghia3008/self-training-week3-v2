@@ -63,3 +63,33 @@ class CommentAPITests(APITestCase):
     def test_delete_comment_not_owner(self):
         response = self.client.delete(self.comment_detail_url, **self.other_auth)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_nested_comment(self):
+        child_data = {
+            "content": "This is a reply",
+            "parent": self.comment.id
+        }
+        response = self.client.post(self.comment_url, child_data, **self.user_auth)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["parent"], self.comment.id)
+
+    def test_retrieve_nested_comments_tree(self):
+        child_comment = CommentFactory(post=self.post, parent=self.comment)
+        grandchild_comment = CommentFactory(post=self.post, parent=child_comment)
+
+        response = self.client.get(self.comment_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Lấy comment gốc
+        results = response.data.get("results", response.data)
+        root_comment = next((c for c in results if c["id"] == self.comment.id), None)
+
+        self.assertIsNotNone(root_comment)
+        self.assertIn("replies", root_comment)
+        self.assertEqual(len(root_comment["replies"]), 1)
+
+        child = root_comment["replies"][0]
+        self.assertEqual(child["id"], child_comment.id)
+        self.assertIn("replies", child)
+        self.assertEqual(len(child["replies"]), 1)
+        self.assertEqual(child["replies"][0]["id"], grandchild_comment.id)

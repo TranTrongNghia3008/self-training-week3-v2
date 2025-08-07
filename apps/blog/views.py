@@ -200,7 +200,20 @@ class CategoryListCreateAPIView(generics.ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save()
+        try:
+            post = Post.objects.get(id=self.kwargs["post_id"])
+        except Post.DoesNotExist:
+            raise NotFound("Post not found")
+
+        parent_id = self.request.data.get("parent")
+        parent = None
+        if parent_id:
+            try:
+                parent = Comment.objects.get(id=parent_id, post=post)
+            except Comment.DoesNotExist:
+                raise NotFound("Parent comment not found")
+
+        serializer.save(author=self.request.user, post=post, parent=parent)
 
 class MediaListCreateAPIView(generics.ListCreateAPIView):
     queryset = Media.objects.all()

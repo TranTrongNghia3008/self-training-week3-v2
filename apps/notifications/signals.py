@@ -6,13 +6,14 @@ from channels.layers import get_channel_layer
 
 @receiver(post_save, sender=Notification)
 def send_realtime_notification(sender, instance, created, **kwargs):
+    print(f"[Signal] Notification created: {instance.id} - {instance.message}")
     if not created:
         return
 
     channel_layer = get_channel_layer()
     group_name = f"notify_{instance.recipient.id}"
 
-    # Nếu content_object tồn tại, lấy thêm thông tin
+    # If content_object exists, get more information
     target_type = instance.content_type.model if instance.content_type else None
     object_id = instance.object_id if instance.object_id else None
 
