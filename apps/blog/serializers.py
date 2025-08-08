@@ -107,6 +107,10 @@ class PostSerializer(serializers.ModelSerializer):
 
 
     def create(self, validated_data):
+        print("scheduled_publish_time", validated_data.get("scheduled_publish_time"))
+        if not validated_data.get("scheduled_publish_time"):
+            validated_data["scheduled_publish_time"] = timezone.now()
+
         categories = validated_data.pop("categories", [])
         post = Post.objects.create(**validated_data)
         post.categories.set(categories)
@@ -140,3 +144,5 @@ class PostSerializer(serializers.ModelSerializer):
                 f"Post rejected for toxic content (score={result['score']:.2f})"
             )
         return value
+
+        

@@ -1,6 +1,8 @@
 from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
+from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 import hashlib
 
 from rest_framework import generics, permissions, parsers
@@ -143,6 +145,67 @@ class PostRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     @swagger_auto_schema(tags=["Post"])
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
+    
+class RelatedPostsAPIView(generics.GenericAPIView):
+    serializer_class = PostSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None  # Không phân trang
+
+    def get_queryset(self):
+        queryset = Post.objects.select_related("author").prefetch_related("comments", "categories")
+        user = self.request.user
+
+        if user.is_staff or user.is_superuser:
+            return queryset
+        if user.is_authenticated:
+            return queryset.filter(
+                Q(is_published=True, scheduled_publish_time__lte=timezone.now()) |
+                Q(author=user)
+            )
+        return queryset.filter(
+            is_published=True,
+            scheduled_publish_time__lte=timezone.now()
+        )
+
+    @swagger_auto_schema(
+        tags=["Post"],
+        manual_parameters=[
+            openapi.Parameter(
+                name="post_id",
+                in_=openapi.IN_PATH,
+                type=openapi.TYPE_INTEGER,
+                description="ID của bài viết gốc"
+            ),
+        ]
+    )
+    def get(self, request, post_id):
+        # Cache
+        cache_key = f"related_posts:{post_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+
+        # Lấy bài gốc
+        post = get_object_or_404(self.get_queryset(), id=post_id)
+
+        # SearchVector + SearchQuery
+        vector = SearchVector('title', weight='A') + SearchVector('content', weight='B')
+        query = SearchQuery(post.title) | SearchQuery(post.content)
+
+        # Lấy bài liên quan
+        related_posts = (
+            self.get_queryset()
+            .annotate(rank=SearchRank(vector, query))
+            .filter(rank__gte=0.1)
+            .exclude(id=post.id)
+            .order_by('-rank')[:5]
+        )
+
+        serializer = self.get_serializer(related_posts, many=True)
+        data = serializer.data
+        cache.set(cache_key, data, timeout=60)
+        return Response(data)
+
     
 class CommentListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = CommentSerializer
