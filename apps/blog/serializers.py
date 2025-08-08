@@ -4,6 +4,7 @@ from django.utils.text import slugify
 from django.utils import timezone
 from .models import Category, Post, Comment, Media
 from apps.users.serializers import UserSerializer
+from apps.core.services.content_moderation import check_toxicity
 
 class RecursiveField(serializers.Serializer):
     def to_representation(self, value):
@@ -19,6 +20,14 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ["id", "author", "content", "created_at", "parent", "replies"]
+
+    def validate_content(self, value):
+        result = check_toxicity(value)
+        if not result["allowed"]:
+            raise serializers.ValidationError(
+                f"Comment rejected for toxic content (score={result['score']:.2f})"
+            )
+        return value
 
 class MediaSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
@@ -123,3 +132,11 @@ class PostSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Post cannot be published before the scheduled publish time.")
 
         return attrs
+    
+    def validate_content(self, value):
+        result = check_toxicity(value)
+        if not result["allowed"]:
+            raise serializers.ValidationError(
+                f"Post rejected for toxic content (score={result['score']:.2f})"
+            )
+        return value

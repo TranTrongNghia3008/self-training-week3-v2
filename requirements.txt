@@ -57,3 +57,4 @@ channels
 websockets
 daphne
 channels_redis
+google-api-python-client
