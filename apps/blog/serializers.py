@@ -79,6 +79,13 @@ class CategorySerializer(serializers.ModelSerializer):
         if "slug" not in validated_data or not validated_data["slug"]:
             validated_data["slug"] = slugify(validated_data["name"])
         return super().create(validated_data)
+    
+class CategoryReportSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    total_views = serializers.IntegerField()
+    total_comments = serializers.IntegerField()
+    new_posts = serializers.IntegerField()
 
 class PostSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)

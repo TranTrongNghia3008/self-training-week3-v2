@@ -8,6 +8,9 @@ from .views import (
     CategoryListCreateAPIView,
     MediaListCreateAPIView,
     MediaRetrieveUpdateDestroyAPIView,
+    CategoryReportAPIView,
+    SearchAnalyticsAPIView,
+    SearchClickUpdateAPIView
 )
 
 urlpatterns = [
@@ -21,7 +24,11 @@ urlpatterns = [
     path("categories/", CategoryListCreateAPIView.as_view(), name="category-list"),
     path("categories/<int:pk>/", CategoryListCreateAPIView.as_view(), 
     name="category-list-create"),
+    path('categories/report/', CategoryReportAPIView.as_view(), name='category-report'),
 
     path("media/", MediaListCreateAPIView.as_view(), name="media-list-create"),
     path("media/<int:pk>/", MediaRetrieveUpdateDestroyAPIView.as_view(), name="media-detail"),
+
+    path('analytics/search/', SearchAnalyticsAPIView.as_view(), name='search-analytics'),
+    path('analytics/search/click/', SearchClickUpdateAPIView.as_view(), name='search-click-update'),
 ]

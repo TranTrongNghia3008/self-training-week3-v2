@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
+from django.utils import timezone
 from apps.notifications.tasks import send_notification_email
 from cloudinary.uploader import destroy
 from urllib.parse import urlparse
@@ -92,3 +93,12 @@ class Media(models.Model):
                 print(f"[Cloudinary] Failed to delete: {e}")
 
         super().delete(*args, **kwargs)
+
+class SearchQueryLog(models.Model):
+    keyword = models.CharField(max_length=255, db_index=True)
+    timestamp = models.DateTimeField(default=timezone.now)
+    results_count = models.PositiveIntegerField(default=0)  # số kết quả trả về
+    clicked = models.BooleanField(default=False)  # người dùng có click vào kết quả không
+
+    def __str__(self):
+        return f"{self.keyword} at {self.timestamp} - results: {self.results_count}, clicked: {self.clicked}"

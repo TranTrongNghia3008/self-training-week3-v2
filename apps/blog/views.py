@@ -1,5 +1,5 @@
 from django.core.cache import cache
-from django.db.models import Q
+from django.db.models import Q, Sum, Count
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
@@ -9,12 +9,14 @@ from rest_framework import generics, permissions, parsers
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
+from rest_framework.views import APIView
+
 
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-from .models import Post, Comment, Category, Media
-from .serializers import PostSerializer, CommentSerializer, CategorySerializer, MediaSerializer
+from .models import Post, Comment, Category, Media, SearchQueryLog
+from .serializers import PostSerializer, CommentSerializer, CategorySerializer, MediaSerializer, CategoryReportSerializer
 from apps.core.permissions import IsOwnerOrReadOnly, ReadOnlyOrAdminCreatePermission, CanViewPost, IsMediaOwnerOrAdmin, CanAddMediaToOwnPost
 from apps.core.utils import delete_cache_by_prefix
 
@@ -45,7 +47,7 @@ class PostListCreateAPIView(generics.ListCreateAPIView):
         ).order_by("-created_at")
 
     def list(self, request, *args, **kwargs):
-        search = request.query_params.get("search", "")
+        search = request.query_params.get("search", "").strip()
         category_ids = request.query_params.get("category", "")
         page = request.query_params.get("page", "1")
 
@@ -70,6 +72,17 @@ class PostListCreateAPIView(generics.ListCreateAPIView):
                     queryset = queryset.filter(categories__in=ids).distinct()
             except ValueError:
                 pass
+
+        # Count the number of returned results (before pagination)
+        total_results = queryset.count()
+
+        # Search Logging
+        if search:
+            SearchQueryLog.objects.create(
+                keyword=search,
+                results_count=total_results,
+                clicked=False  
+            )
 
         page_obj = self.paginate_queryset(queryset)
         if page_obj is not None:
@@ -278,6 +291,39 @@ class CategoryListCreateAPIView(generics.ListCreateAPIView):
 
         serializer.save(author=self.request.user, post=post, parent=parent)
 
+class CategoryReportAPIView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        days_ago = request.query_params.get("days", 30)
+        try:
+            days_ago = int(days_ago)
+        except ValueError:
+            days_ago = 30
+
+        since_date = timezone.now() - timezone.timedelta(days=days_ago)
+
+        categories = Category.objects.annotate(
+            total_views=Sum('posts__views', distinct=True),
+            total_comments=Count('posts__comments', distinct=True),
+            new_posts=Count('posts', filter=Q(posts__created_at__gte=since_date)),
+        ).order_by('-total_views')
+
+        # Chuẩn bị data dạng dict cho serializer
+        data = []
+        for cat in categories:
+            data.append({
+                "id": cat.id,
+                "name": cat.name,
+                "total_views": cat.total_views or 0,
+                "total_comments": cat.total_comments or 0,
+                "new_posts": cat.new_posts or 0,
+            })
+
+        # Khởi tạo serializer với many=True
+        serializer = CategoryReportSerializer(data, many=True)
+        return Response(serializer.data)
+
 class MediaListCreateAPIView(generics.ListCreateAPIView):
     queryset = Media.objects.all()
     serializer_class = MediaSerializer
@@ -332,3 +378,50 @@ class MediaRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     @swagger_auto_schema(tags=["Media"])
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
+
+class SearchAnalyticsAPIView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        days_ago = request.query_params.get("days", 30)
+        try:
+            days_ago = int(days_ago)
+        except ValueError:
+            days_ago = 30
+
+        since_date = timezone.now() - timezone.timedelta(days=days_ago)
+
+        logs = SearchQueryLog.objects.filter(timestamp__gte=since_date)
+
+        popular_keywords = logs.values('keyword').annotate(
+            search_count=Count('id'),
+            click_count=Count('id', filter=Q(clicked=True)),
+            avg_results=Sum('results_count') / Count('id'),
+        ).order_by('-search_count')[:10]
+
+        # Keywords with few or no results (e.g. results_count <= 3)
+        low_results_keywords = logs.values('keyword').annotate(
+            search_count=Count('id'),
+            avg_results=Sum('results_count') / Count('id'),
+        ).filter(avg_results__lte=3).order_by('avg_results')[:10]
+
+        return Response({
+            "popular_keywords": list(popular_keywords),
+            "low_results_keywords": list(low_results_keywords),
+        })
+    
+class SearchClickUpdateAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        keyword = request.data.get("keyword", "").strip()
+        if not keyword:
+            return Response({"detail": "Keyword required"}, status=400)
+
+        # Update the most recent search log for this keyword (assuming new user click)
+        log = SearchQueryLog.objects.filter(keyword=keyword, clicked=False).order_by('-timestamp').first()
+        if log:
+            log.clicked = True
+            log.save()
+            return Response({"detail": "Click updated"})
+        return Response({"detail": "No log entry found to update"}, status=404)
