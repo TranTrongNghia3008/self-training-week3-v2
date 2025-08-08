@@ -1,5 +1,6 @@
 from rest_framework.test import APITestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from apps.users.test.factories import UserFactory
 from apps.blog.test.factories import PostFactory, CategoryFactory
@@ -12,7 +13,8 @@ class PostAPITests(APITestCase):
         cache.clear()
         self.user = UserFactory()
         self.category = CategoryFactory()
-        self.post = PostFactory(author=self.user, categories=[self.category], is_published=True)
+        self.now = timezone.now()
+        self.post = PostFactory(author=self.user, categories=[self.category], is_published=True, scheduled_publish_time=self.now)
 
         self.list_url = reverse('blog:post-list-create')
         self.detail_url = reverse('blog:post-detail', args=[self.post.id])
@@ -105,7 +107,7 @@ class PostAPITests(APITestCase):
             self.assertIn(new_category.id, category_ids)
 
     def test_post_pagination(self):
-        PostFactory.create_batch(15, author=self.user)
+        PostFactory.create_batch(15, author=self.user, is_published=True, scheduled_publish_time=self.now)
         for post in PostFactory.create_batch(5, author=self.user, categories=[self.category]):
             pass  # categories already added via factory
 
